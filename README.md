@@ -243,7 +243,6 @@ The project produces:
 -  LSTM effectively captures **sequential degradation patterns**
 -  Engine-wise windowing prevents **data leakage**
 -  Hyperparameter optimization significantly improves performance
-#Try my model here 
-https://predictive-maintaince-m61o.onrender.com 
+
 
 
