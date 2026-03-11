@@ -1,3 +1,4 @@
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Open%20Streamlit%20App-brightgreen?style=for-the-badge&logo=streamlit)](https://predictivemaintaince-appcfspnqqbnxskrsrcvhro.streamlit.app/)
 # Aircraft Engine Remaining Useful Life (RUL) Prediction using LSTM
 
 Predicting when an aircraft engine will fail is a critical problem in **predictive maintenance**.
