@@ -1,204 +1,248 @@
-This project focuses on Remaining Useful Life (RUL) prediction for aircraft engines using the NASA C-MAPSS FD001 dataset.
-The goal is to predict how many cycles remain before engine failure using multivariate sensor time-series data.
+#  Aircraft Engine Remaining Useful Life (RUL) Prediction using LSTM
 
-A Long Short-Term Memory (LSTM) network is used to model temporal degradation patterns, and Optuna is used for systematic hyperparameter optimization.
+Predicting when an aircraft engine will fail is a critical problem in **predictive maintenance**.  
+This project builds a deep learning model to estimate the **Remaining Useful Life (RUL)** of turbofan engines using **multivariate time-series sensor data**.
 
-Dataset Description (C-MAPSS FD001)
+The model leverages a **Long Short-Term Memory (LSTM)** network to learn degradation patterns over time, while **Optuna** is used for automated hyperparameter optimization.
 
-The dataset consists of three files:
+ **Dataset:** NASA C-MAPSS FD001
 
-train_FD001.txt
+---
 
-Complete run-to-failure data
+# 📌 Project Overview
 
-Used for training and validation
+Aircraft engines degrade gradually during operation. Instead of waiting for failure, predictive models estimate how long an engine can continue operating safely.
 
-test_FD001.txt
+This project develops a **data-driven predictive maintenance pipeline** that:
 
-Partial engine life (failure not observed)
+-  Learns degradation patterns from sensor signals  
+-  Models temporal dependencies using LSTM  
+-  Tunes model hyperparameters using Optuna  
+-  Predicts the remaining cycles before failure  
 
-RUL_FD001.txt
+---
 
-One RUL value per test engine
+# 🛰 Dataset: NASA C-MAPSS FD001
 
-Corresponds to the last observed cycle only
+The **Commercial Modular Aero-Propulsion System Simulation (C-MAPSS)** dataset was created by NASA to simulate aircraft engine degradation.
 
-Each row contains:
+##  Dataset Files
 
-engine_id
+| File | Purpose |
+|-----|--------|
+| `train_FD001.txt` | Complete engine life until failure |
+| `test_FD001.txt` | Partial engine trajectories |
+| `RUL_FD001.txt` | True RUL for test engines |
 
-cycle
+Each record includes:
 
-3 operating conditions (op1, op2, op3)
+-  `engine_id`
+-  `cycle`
+-  `op1, op2, op3` (operating conditions)
+-  `s1 – s21` (sensor measurements)
 
-21 sensor readings (s1 to s21)
+---
 
- Data Processing & Feature Engineering
-✔ Key preprocessing steps
+#  Data Preprocessing & Feature Engineering
 
-Computed RUL for training data:
+## RUL Computation
 
-RUL = max_cycle_per_engine − current_cycle
+For the training dataset:
 
+```
+RUL = max_cycle_of_engine − current_cycle
+```
 
-Dropped non-informative sensors (near-zero variance):
+This produces a **regression label for every timestep**.
 
+---
+
+##  Removing Non-Informative Sensors
+
+Sensors with **near-zero variance** were removed:
+
+```
 s1, s5, s6, s10, s12, s13, s16, s18, s19
+```
 
+Dropped columns:
 
-Dropped:
+```
+engine_id → identifier only  
+cycle → relative time index  
+op3 → constant value
+```
 
-engine_id (identifier only)
+---
 
-cycle (relative time index)
+## ✅ Final Feature Set
 
-op3 (constant)
+The model uses:
 
-Retained:
+-  Operating conditions: `op1`, `op2`
+-  14 meaningful sensors
 
-op1, op2
+These features capture **engine operating states and degradation signals**.
 
-14 meaningful sensor features
+---
 
-Applied standardization:
+## Feature Scaling
 
-Scaler fitted on training split only
+To ensure stable model training:
 
-Applied to validation and test
+- Standardization is applied  
+- Scaler is fitted on **training data only**  
+- Same scaler applied to **validation and test sets**
 
- Sequence Construction (Sliding Window)
+This prevents **data leakage**.
 
-Fixed window size (optimized using Optuna)
+---
 
-Sequences are created engine-wise
+#  Sequence Construction (Sliding Window)
 
-No mixing of timestamps across engines
+Since degradation is **temporal**, the model receives sequences instead of individual rows.
 
-Final LSTM input shape:
+Key design decisions:
 
+-  Fixed window size (optimized via Optuna)
+-  Sequences created **engine-wise**
+-  No mixing of timestamps across engines
+
+Final LSTM input format:
+
+```
 (batch_size, window_size, num_features)
+```
 
+### Test Data Handling
 
-For test data:
+For each engine in the test set:
 
-Only the last window per engine is used
+- Only the **last window** is used
+- Target labels come from `RUL_FD001.txt`
 
-Labels come from RUL_FD001.txt
+---
 
- Model Architecture (LSTM)
-Input (window_size × features)
-        ↓
-LSTM (hidden_size, num_layers)
-        ↓
-Last timestep output
-        ↓
-Fully Connected Layer
-        ↓
-Predicted RUL
+#  Model Architecture
 
-Model characteristics
+The model follows a **Many-to-One LSTM architecture**:
 
-Many-to-one sequence modeling
+```
+Input Sequence (window_size × features)
+          ↓
+        LSTM
+(hidden_size, num_layers)
+          ↓
+ Last Time-Step Output
+          ↓
+ Fully Connected Layer
+          ↓
+   Predicted RUL
+```
 
-Regression output
+### Model Characteristics
 
-Implemented using PyTorch
+-  Temporal sequence modeling  
+-  Regression output  
+-  Implemented in **PyTorch**
 
-⚙️ Hyperparameter Optimization (Optuna)
+---
 
-Optuna is used to tune:
+# ⚙️ Hyperparameter Optimization (Optuna)
 
-window_size
+Instead of manually tuning parameters, **Optuna** performs automated hyperparameter search.
 
-hidden_size
+Parameters optimized:
 
-num_layers
+- `window_size`
+- `hidden_size`
+- `num_layers`
+- `dropout`
+- `learning_rate`
+-  `batch_size`
 
-dropout
+### Optimization Strategy
 
-learning_rate
+🎯 Objective: **Minimize Validation RMSE**
 
-batch_size
+During Optuna trials:
 
-Optimization strategy
+- Training uses fewer epochs for faster search
+- The test set is **never used during tuning**
 
-Objective: minimize validation RMSE
+---
 
-Training inside Optuna uses fewer epochs (fast search)
+#  Evaluation Metric
 
-Test set is never used during tuning
-
-Evaluation Metrics
-Primary metric: RMSE
+### Primary Metric: Root Mean Squared Error (RMSE)
 
 Used for:
 
-Training monitoring
+-  Training monitoring
+-  Validation during hyperparameter tuning
+-  Final test evaluation
 
-Validation (Optuna objective)
+### Why RMSE?
 
-Final test evaluation
+✔ Standard metric in RUL prediction literature  
+✔ Penalizes large prediction errors  
+✔ Interpretable in **engine cycles**
 
-Why RMSE?
+*(NASA asymmetric scoring can be added later as an extension.)*
 
-Standard metric in RUL literature
+---
 
-Penalizes large errors
+# ▶️ How to Run
 
-Interpretable in units of cycles
+### 1️⃣ Install dependencies
 
-(NASA asymmetric score can be added later as an extension)
-
- How to Run
-1️⃣ Install dependencies
+```bash
 pip install numpy pandas torch optuna scikit-learn
+```
 
-2️⃣ Run the notebook / script
+### 2️⃣ Run the pipeline
 
-Data loading & preprocessing
+The script or notebook performs:
 
-Sequence construction
+- 🔹 Data loading and preprocessing
+- 🔹 Feature engineering
+- 🔹 Sequence construction
+- 🔹 Optuna hyperparameter search
+- 🔹 Final model training
+- 🔹 Test evaluation
 
-Optuna hyperparameter search
+---
 
-Final model training
+### 3️⃣ Saved Model
 
-Test evaluation
+After training, the best model is saved as:
 
-3️⃣Saved artifact
+```
 best_rul_lstm.pth
+```
+
+This file contains the **trained PyTorch model with optimized hyperparameters**.
+
+---
+
+#  Final Outputs
+
+The project produces:
+
+-  Best hyperparameters discovered by Optuna
+-  Validation RMSE per trial
+-  Final Test RMSE on FD001
+-  Saved trained PyTorch model
+
+---
+
+#  Key Learnings
+
+-  RUL prediction is fundamentally a **time-series problem**
+-  Engine degradation follows **temporal trajectories**
+-  LSTM effectively captures **sequential degradation patterns**
+-  Engine-wise windowing prevents **data leakage**
+-  Hyperparameter optimization significantly improves performance
 
 
-Contains the trained model with best hyperparameters.
 
- Final Outputs
-
-Best hyperparameters found by Optuna
-
-Validation RMSE per trial
-
-Final Test RMSE on FD001
-
-Saved PyTorch model
-
- Key Learnings
-
-RUL prediction is inherently a temporal problem
-
-LSTM captures degradation trajectories better than static models
-
-Engine-wise windowing is critical to avoid data leakage
-
-Hyperparameter tuning significantly improves performance
-
- Future Improvements
-
-Add NASA asymmetric scoring function
-
-Try GRU or Transformer models
-
-Include RUL capping
-
-Use early stopping + Optuna pruning
-
-Cross-dataset evaluation (FD002–FD004)
